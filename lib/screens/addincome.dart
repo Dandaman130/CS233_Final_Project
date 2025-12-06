@@ -16,30 +16,18 @@ the need to do so.
 
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; //Package to implement chart
-import 'addincome.dart';
 
-class Income extends StatelessWidget {
-  const Income({Key? key}) : super(key: key);
+class AddIncome extends StatelessWidget {
+  const AddIncome({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Income'),
+        title: const Text('Add Income'),
       ),
       body: const Center(
-        child: Text('Income'),
-      ),
-      floatingActionButton: FloatingActionButton.small(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AddIncome(),
-            ),
-          );
-        },
-        child: const Icon(Icons.add),
+        child: Text('Add Income'),
       ),
     );
   }

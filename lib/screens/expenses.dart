@@ -11,7 +11,33 @@ Features to Develop:
 - Anything else we can think of
  */
 
-
-
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; //Package to implement chart
+import 'addexpense.dart';
+
+class Expenses extends StatelessWidget {
+  const Expenses({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Expenses'),
+      ),
+      body: const Center(
+        child: Text('Expenses'),
+      ),
+        floatingActionButton: FloatingActionButton.small(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AddExpense(),
+              ),
+            );
+          },
+          child: const Icon(Icons.add),
+        ),
+    );
+  }
+}
