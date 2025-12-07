@@ -21,6 +21,7 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import '../models/expense.dart';
+import '../models/incomes.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -64,6 +65,18 @@ class DatabaseHelper {
 
     await db.execute('''
       CREATE TABLE expenses (
+        id $idType,
+        amount $realType,
+        category $textType,
+        date $textType,
+        note $textTypeNullable,
+        currency $textType DEFAULT 'USD',
+        created_at $textType
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE incomes (
         id $idType,
         amount $realType,
         category $textType,
@@ -185,6 +198,122 @@ class DatabaseHelper {
   Future close() async {
     final db = await database;
     db.close();
+  }
+
+  // -----------------------------
+// INCOME CRUD OPERATIONS
+// -----------------------------
+
+// Insert a new income
+  Future<int> createIncome(Incomes income) async {
+    final db = await database;
+    return await db.insert('incomes', income.toMap());
+  }
+
+// Get a single income by ID
+  Future<Incomes?> getIncome(int id) async {
+    final db = await database;
+    final maps = await db.query(
+      'incomes',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isNotEmpty) {
+      return Incomes.fromMap(maps.first);
+    }
+    return null;
+  }
+
+// Get all incomes
+  Future<List<Incomes>> getAllIncomes() async {
+    final db = await database;
+
+    final result = await db.query(
+      'incomes',
+      orderBy: 'date DESC, created_at DESC',
+    );
+
+    return result.map((map) => Incomes.fromMap(map)).toList();
+  }
+
+// Get incomes by month
+  Future<List<Incomes>> getIncomesByMonth(int year, int month) async {
+    final db = await database;
+    final startDate = DateTime(year, month, 1).toIso8601String().substring(0, 10);
+    final endDate =
+    DateTime(year, month + 1, 0).toIso8601String().substring(0, 10);
+
+    final result = await db.query(
+      'incomes',
+      where: 'date >= ? AND date <= ?',
+      whereArgs: [startDate, endDate],
+      orderBy: 'date DESC',
+    );
+
+    return result.map((map) => Incomes.fromMap(map)).toList();
+  }
+
+// Get incomes by category
+  Future<List<Incomes>> getIncomesByCategory(String category) async {
+    final db = await database;
+    final result = await db.query(
+      'incomes',
+      where: 'category = ?',
+      whereArgs: [category],
+      orderBy: 'date DESC',
+    );
+
+    return result.map((map) => Incomes.fromMap(map)).toList();
+  }
+
+// Update an income
+  Future<int> updateIncome(Incomes income) async {
+    final db = await database;
+    return await db.update(
+      'incomes',
+      income.toMap(),
+      where: 'id = ?',
+      whereArgs: [income.id],
+    );
+  }
+
+// Delete an income
+  Future<int> deleteIncome(int id) async {
+    final db = await database;
+    return await db.delete(
+      'incomes',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+// -----------------------------
+// AGGREGATE INCOME QUERIES
+// -----------------------------
+
+// Total income amount
+  Future<double> getTotalIncome() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT SUM(amount) as total FROM incomes');
+    return result.first['total'] as double? ?? 0.0;
+  }
+
+// Income grouped by category
+  Future<Map<String, double>> getIncomeByCategory() async {
+    final db = await database;
+
+    final result = await db.rawQuery('''
+    SELECT category, SUM(amount) as total 
+    FROM incomes 
+    GROUP BY category
+  ''');
+
+    final Map<String, double> categoryTotals = {};
+    for (var row in result) {
+      categoryTotals[row['category'] as String] = row['total'] as double;
+    }
+    return categoryTotals;
   }
 }
 
