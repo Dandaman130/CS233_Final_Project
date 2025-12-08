@@ -12,16 +12,30 @@ Features:
 import 'package:flutter/material.dart';
 
 class Settings extends StatelessWidget {
-  const Settings({Key? key}) : super(key: key);
+  final bool isDarkMode;
+  final ValueChanged<bool> onDarkModeChanged;
+
+  const Settings({
+    Key? key,
+    required this.isDarkMode,
+    required this.onDarkModeChanged,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
+      appBar: AppBar(title: const Text("Settings"),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: const Center(
-        child: Text('Settings'),
+      body: ListView(
+        children: [
+          SwitchListTile(
+            title: const Text("Dark Mode"),
+            value: isDarkMode,
+            onChanged: onDarkModeChanged,
+            secondary: const Icon(Icons.nightlight_round),
+          ),
+        ],
       ),
     );
   }
