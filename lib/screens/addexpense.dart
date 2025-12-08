@@ -41,7 +41,8 @@ class _AddExpenseState extends State<AddExpense> {
   // Form state variables
   String _selectedCategory = ExpenseCategories.food; // Default category
   DateTime _selectedDate = DateTime.now(); // Default to today
-  String _selectedCurrency = 'USD'; // Default currency, scalable to other currencies
+  String _selectedCurrency =
+      'USD'; // Default currency, scalable to other currencies
   bool _isSaving = false; // Loading state during save operation
 
   @override
@@ -73,7 +74,9 @@ class _AddExpenseState extends State<AddExpense> {
         amount: double.parse(_amountController.text),
         category: _selectedCategory,
         date: _selectedDate.toIso8601String().substring(0, 10), // YYYY-MM-DD
-        note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
+        note: _noteController.text.trim().isEmpty
+            ? null
+            : _noteController.text.trim(),
         currency: _selectedCurrency,
       );
 
@@ -88,9 +91,9 @@ class _AddExpenseState extends State<AddExpense> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error saving expense: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error saving expense: $e')));
         }
       } finally {
         if (mounted) {
@@ -129,9 +132,13 @@ class _AddExpenseState extends State<AddExpense> {
                         ),
                         filled: true,
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d+\.?\d{0,2}'),
+                        ),
                       ],
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -241,7 +248,9 @@ class _AddExpenseState extends State<AddExpense> {
                       child: ElevatedButton(
                         onPressed: _saveExpense,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -249,7 +258,10 @@ class _AddExpenseState extends State<AddExpense> {
                         ),
                         child: const Text(
                           'Save Expense',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),

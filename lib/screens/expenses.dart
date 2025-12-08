@@ -39,6 +39,7 @@ class _ExpensesState extends State<Expenses> {
   List<Expense> _expenses = []; // List of all expenses
   Map<String, double> _categoryTotals = {}; // Total spending per category
   double _totalSpending = 0.0; // Grand total of all expenses
+  double _totalIncome = 0.0; // Total income from income screen
   bool _isLoading = true; // Loading state for async operations
 
   // Start up
@@ -65,11 +66,15 @@ class _ExpensesState extends State<Expenses> {
     // Get grand total of all expenses
     final total = await _dbHelper.getTotalSpending();
 
+    // Get total income from income screen
+    final totalIncome = await _dbHelper.getTotalIncome();
+
     // Update UI with fetched data
     setState(() {
       _expenses = expenses;
       _categoryTotals = categoryTotals;
       _totalSpending = total;
+      _totalIncome = totalIncome;
       _isLoading = false; // Hide loading indicator
     });
   }
@@ -87,7 +92,9 @@ class _ExpensesState extends State<Expenses> {
     if (expenses.isNotEmpty) {
       print('Expense List:');
       for (var expense in expenses) {
-        print('  • ${expense.category}: ${expense.currency} \$${expense.amount.toStringAsFixed(2)} on ${expense.date}');
+        print(
+          '  • ${expense.category}: ${expense.currency} \$${expense.amount.toStringAsFixed(2)} on ${expense.date}',
+        );
         if (expense.note != null) print('    Note: ${expense.note}');
       }
     } else {
@@ -101,9 +108,7 @@ class _ExpensesState extends State<Expenses> {
   Future<void> _navigateToAddExpense() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const AddExpense(),
-      ),
+      MaterialPageRoute(builder: (context) => const AddExpense()),
     );
     // Refresh expenses list after returning (in case new expense was added)
     _loadExpenses();
@@ -115,9 +120,9 @@ class _ExpensesState extends State<Expenses> {
     await _dbHelper.deleteExpense(id);
     _loadExpenses(); // Reload data to reflect deletion
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Expense deleted')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Expense deleted')));
     }
   }
 
@@ -134,7 +139,8 @@ class _ExpensesState extends State<Expenses> {
       'Transportation': Colors.teal,
       'Other': Colors.grey,
     };
-    return colors[category] ?? Colors.grey; // Default to grey if category not found
+    return colors[category] ??
+        Colors.grey; // Default to grey if category not found
   }
 
   // Get the icon associated with each category
@@ -150,7 +156,8 @@ class _ExpensesState extends State<Expenses> {
       'Transportation': Icons.directions_bus,
       'Other': Icons.category,
     };
-    return icons[category] ?? Icons.category; // Default to category icon if not found
+    return icons[category] ??
+        Icons.category; // Default to category icon if not found
   }
 
   // Main build method - constructs the UI
@@ -167,22 +174,23 @@ class _ExpensesState extends State<Expenses> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _expenses.isEmpty
-              ? _buildEmptyState() // Show "no expenses" message if empty
-              : SingleChildScrollView( // Show expense data if available
-                  child: Column(
-                    children: [
-                      // Total Spending Card - displays grand total
-                      _buildTotalSpendingCard(),
+          ? _buildEmptyState() // Show "no expenses" message if empty
+          : SingleChildScrollView(
+              // Show expense data if available
+              child: Column(
+                children: [
+                  // Total Spending Card - displays grand total
+                  _buildTotalSpendingCard(),
 
-                      // Pie Chart Section - visual breakdown by category
-                      // Only shown if there are categorized expenses
-                      if (_categoryTotals.isNotEmpty) _buildPieChartSection(),
+                  // Pie Chart Section - visual breakdown by category
+                  // Only shown if there are categorized expenses
+                  if (_categoryTotals.isNotEmpty) _buildPieChartSection(),
 
-                      // Expenses List - chronological list of all expenses
-                      _buildExpensesList(),
-                    ],
-                  ),
-                ),
+                  // Expenses List - chronological list of all expenses
+                  _buildExpensesList(),
+                ],
+              ),
+            ),
 
       // Navigates to Add Expense screen
       floatingActionButton: FloatingActionButton.small(
@@ -221,37 +229,80 @@ class _ExpensesState extends State<Expenses> {
   }
 
   // Build total spending card widget
-  // Displays the sum of all expenses in a prominent card
+  // Displays Income, Spending, and Income Remaining in a row
   Widget _buildTotalSpendingCard() {
+    final incomeRemaining = _totalIncome - _totalSpending;
+
     return Card(
       margin: const EdgeInsets.all(16),
       elevation: 4,
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            // Card title
-            const Text(
-              'Total Spending',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 8),
-
-            // Large total amount in red (expense color)
-            Text(
-              '\$${_totalSpending.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.red,
+            // Income column
+            Expanded(
+              child: Column(
+                children: [
+                  const Text(
+                    'Income',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '\$${_totalIncome.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 4),
 
-            // Time period label
-            Text(
-              'All time',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            // Spending column
+            Expanded(
+              child: Column(
+                children: [
+                  const Text(
+                    'Spending',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '\$${_totalSpending.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Income Remaining column
+            Expanded(
+              child: Column(
+                children: [
+                  const Text(
+                    'Income Remaining',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '\$${incomeRemaining.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: incomeRemaining >= 0 ? Colors.blue : Colors.red,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -300,19 +351,21 @@ class _ExpensesState extends State<Expenses> {
   }
 
   // Build pie chart sections from category totals
-  // Each section represents one expense category with color and percentage
+  // Each section represents one expense category with color, percentage, and dollar amount
   List<PieChartSectionData> _buildPieChartSections() {
     return _categoryTotals.entries.map((entry) {
       // Calculate percentage of total for this category
       final percentage = (_categoryTotals[entry.key]! / _totalSpending) * 100;
+      final dollarAmount = entry.value;
 
       return PieChartSectionData(
         color: _getCategoryColor(entry.key), // Category-specific color
         value: entry.value, // Actual spending amount (determines slice size)
-        title: '${percentage.toStringAsFixed(1)}%', // Display percentage on slice
+        title:
+            '${percentage.toStringAsFixed(1)}%\n\$${dollarAmount.toStringAsFixed(2)}', // Display percentage and dollar amount on slice
         radius: 80, // Slice radius (thickness)
         titleStyle: const TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.bold,
           color: Colors.white, // White text for contrast
         ),
@@ -371,7 +424,8 @@ class _ExpensesState extends State<Expenses> {
           // Using ListView.builder for efficient rendering of large lists
           ListView.builder(
             shrinkWrap: true, // Let ListView size itself based on children
-            physics: const NeverScrollableScrollPhysics(), // Disable internal scrolling (parent ScrollView handles it)
+            physics:
+                const NeverScrollableScrollPhysics(), // Disable internal scrolling (parent ScrollView handles it)
             itemCount: _expenses.length, // Number of items to display
             itemBuilder: (context, index) {
               final expense = _expenses[index];
@@ -438,7 +492,9 @@ class _ExpensesState extends State<Expenses> {
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('Delete Expense?'),
-              content: const Text('Are you sure you want to delete this expense?'),
+              content: const Text(
+                'Are you sure you want to delete this expense?',
+              ),
               actions: [
                 // Cancel button
                 TextButton(
@@ -452,7 +508,10 @@ class _ExpensesState extends State<Expenses> {
                     Navigator.pop(context); // Close dialog
                     _deleteExpense(expense.id!); // Delete expense from database
                   },
-                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                  child: const Text(
+                    'Delete',
+                    style: TextStyle(color: Colors.red),
+                  ),
                 ),
               ],
             ),

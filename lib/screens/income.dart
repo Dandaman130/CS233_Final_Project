@@ -87,7 +87,9 @@ class _IncomeState extends State<Income> {
     if (incomes.isNotEmpty) {
       print('Income List:');
       for (var income in incomes) {
-        print('  • ${income.category}: ${income.currency} \$${income.amount.toStringAsFixed(2)} on ${income.date}');
+        print(
+          '  • ${income.category}: ${income.currency} \$${income.amount.toStringAsFixed(2)} on ${income.date}',
+        );
         if (income.note != null) print('    Note: ${income.note}');
       }
     } else {
@@ -101,9 +103,7 @@ class _IncomeState extends State<Income> {
   Future<void> _navigateToAddIncome() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const AddIncome(),
-      ),
+      MaterialPageRoute(builder: (context) => const AddIncome()),
     );
     // Refresh incomes list after returning (in case new income was added)
     _loadIncomes();
@@ -115,9 +115,9 @@ class _IncomeState extends State<Income> {
     await _dbHelper.deleteIncome(id);
     _loadIncomes(); // Reload data to reflect deletion
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Income deleted')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Income deleted')));
     }
   }
 
@@ -131,7 +131,8 @@ class _IncomeState extends State<Income> {
       'Capital Gain': Colors.red,
       'Other': Colors.grey,
     };
-    return colors[category] ?? Colors.grey; // Default to grey if category not found
+    return colors[category] ??
+        Colors.grey; // Default to grey if category not found
   }
 
   // Get the icon associated with each category
@@ -144,7 +145,8 @@ class _IncomeState extends State<Income> {
       'Capital Gain': Icons.line_axis_rounded,
       'Other': Icons.category,
     };
-    return icons[category] ?? Icons.category; // Default to category icon if not found
+    return icons[category] ??
+        Icons.category; // Default to category icon if not found
   }
 
   // Main build method - constructs the UI
@@ -162,21 +164,22 @@ class _IncomeState extends State<Income> {
           ? const Center(child: CircularProgressIndicator())
           : _income.isEmpty
           ? _buildEmptyState() // Show "no incomes" message if empty
-          : SingleChildScrollView( // Show incomes data if available
-        child: Column(
-          children: [
-            // Total Earnings Card - displays grand total
-            _buildTotalEarningsCard(),
+          : SingleChildScrollView(
+              // Show incomes data if available
+              child: Column(
+                children: [
+                  // Total Earnings Card - displays grand total
+                  _buildTotalEarningsCard(),
 
-            // Pie Chart Section - visual breakdown by category
-            // Only shown if there are categorized incomes
-            if (_categoryTotals.isNotEmpty) _buildPieChartSection(),
+                  // Pie Chart Section - visual breakdown by category
+                  // Only shown if there are categorized incomes
+                  if (_categoryTotals.isNotEmpty) _buildPieChartSection(),
 
-            // Incomes List - chronological list of all incomes
-            _buildIncomeList(),
-          ],
-        ),
-      ),
+                  // Incomes List - chronological list of all incomes
+                  _buildIncomeList(),
+                ],
+              ),
+            ),
 
       // Navigates to Add Income screen
       floatingActionButton: FloatingActionButton.small(
@@ -303,7 +306,8 @@ class _IncomeState extends State<Income> {
       return PieChartSectionData(
         color: _getCategoryColor(entry.key), // Category-specific color
         value: entry.value, // Actual spending amount (determines slice size)
-        title: '${percentage.toStringAsFixed(1)}%', // Display percentage on slice
+        title:
+            '${percentage.toStringAsFixed(1)}%', // Display percentage on slice
         radius: 80, // Slice radius (thickness)
         titleStyle: const TextStyle(
           fontSize: 12,
@@ -365,7 +369,8 @@ class _IncomeState extends State<Income> {
           // Using ListView.builder for efficient rendering of large lists
           ListView.builder(
             shrinkWrap: true, // Let ListView size itself based on children
-            physics: const NeverScrollableScrollPhysics(), // Disable internal scrolling (parent ScrollView handles it)
+            physics:
+                const NeverScrollableScrollPhysics(), // Disable internal scrolling (parent ScrollView handles it)
             itemCount: _income.length, // Number of items to display
             itemBuilder: (context, index) {
               final income = _income[index];
@@ -432,7 +437,9 @@ class _IncomeState extends State<Income> {
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('Delete Income?'),
-              content: const Text('Are you sure you want to delete this income?'),
+              content: const Text(
+                'Are you sure you want to delete this income?',
+              ),
               actions: [
                 // Cancel button
                 TextButton(
@@ -446,7 +453,10 @@ class _IncomeState extends State<Income> {
                     Navigator.pop(context); // Close dialog
                     _deleteIncome(incomes.id!); // Delete income from database
                   },
-                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                  child: const Text(
+                    'Delete',
+                    style: TextStyle(color: Colors.red),
+                  ),
                 ),
               ],
             ),
