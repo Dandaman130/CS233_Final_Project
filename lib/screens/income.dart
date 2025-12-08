@@ -22,6 +22,7 @@ import 'package:intl/intl.dart'; // Package for date formatting
 import 'addincome.dart'; // Screen for adding new incomes
 import '../models/incomes.dart'; // Income data model
 import '../database/database_helper.dart'; // SQLite database helper
+import '../screens/settings.dart'; // For currency settings
 
 // Main Incomes widget (StatefulWidget for dynamic data)
 class Income extends StatefulWidget {
@@ -155,9 +156,16 @@ class _IncomeState extends State<Income> {
   Widget build(BuildContext context) {
     return Scaffold(
       // App bar with title
-      appBar: AppBar(
-        title: const Text('Incomes'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(100),
+        child: Container(
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('images/track_ya_cash_img.png'),
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
       ),
 
       body: _isLoading

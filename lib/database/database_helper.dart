@@ -22,6 +22,7 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import '../models/expense.dart';
 import '../models/incomes.dart';
+import '../screens/settings.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -84,6 +85,13 @@ class DatabaseHelper {
         note $textTypeNullable,
         currency $textType DEFAULT 'USD',
         created_at $textType
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        currency TEXT NOT NULL DEFAULT 'USD'
+        
       )
     ''');
   }
@@ -314,6 +322,24 @@ class DatabaseHelper {
       categoryTotals[row['category'] as String] = row['total'] as double;
     }
     return categoryTotals;
+  }
+
+  Future<void> saveCurrency(String currency) async {
+    final db = await database;
+    await db.insert(
+      'settings',
+      {'currency': currency},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<String> getCurrency() async {
+    final db = await database;
+    final result = await db.query('settings', limit: 1);
+    if (result.isNotEmpty) {
+      return result.first['currency'] as String;
+    }
+    return 'USD'; // fallback
   }
 }
 

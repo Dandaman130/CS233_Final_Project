@@ -18,6 +18,7 @@ Features:
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For input formatters
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:shared_preferences/shared_preferences.dart'; // Add this import
 import '../models/expense.dart'; // Expense data model
 import '../database/database_helper.dart'; // SQLite database helper
 
@@ -41,9 +42,37 @@ class _AddExpenseState extends State<AddExpense> {
   // Form state variables
   String _selectedCategory = ExpenseCategories.food; // Default category
   DateTime _selectedDate = DateTime.now(); // Default to today
-  String _selectedCurrency =
-      'USD'; // Default currency, scalable to other currencies
+  String _selectedCurrency = 'USD'; // Default currency, will be loaded from settings
   bool _isSaving = false; // Loading state during save operation
+  bool _isLoading = true; // Add loading state
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrency(); // Load saved currency when screen opens
+  }
+
+  // Load saved currency from SharedPreferences
+  Future<void> _loadCurrency() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _selectedCurrency = prefs.getString('currency') ?? 'USD';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      // If SharedPreferences fails, just use default USD and continue
+      print('Error loading currency: $e');
+      if (mounted) {
+        setState(() {
+          _selectedCurrency = 'USD';
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -108,167 +137,156 @@ class _AddExpenseState extends State<AddExpense> {
     final dateFormatter = DateFormat('MMM dd, yyyy');
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add Expense'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(100),
+        child: Container(
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('images/track_ya_cash_img.png'),
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
       ),
       body: _isSaving
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Amount Field
-                    TextFormField(
-                      controller: _amountController,
-                      decoration: InputDecoration(
-                        labelText: 'Amount',
-                        prefixText: '\$ ',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+          : _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Amount Field
+                        TextFormField(
+                          controller: _amountController,
+                          decoration: InputDecoration(
+                            labelText: 'Amount',
+                            prefixText: '\$ ',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            filled: true,
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d+\.?\d{0,2}'),
+                            ),
+                          ],
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter an amount';
+                            }
+                            final amount = double.tryParse(value);
+                            if (amount == null || amount <= 0) {
+                              return 'Please enter a valid amount';
+                            }
+                            return null;
+                          },
                         ),
-                        filled: true,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                          RegExp(r'^\d+\.?\d{0,2}'),
+                        const SizedBox(height: 20),
+
+                        // Category Dropdown
+                        DropdownButtonFormField<String>(
+                          value: _selectedCategory,
+                          decoration: InputDecoration(
+                            labelText: 'Category',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            filled: true,
+                          ),
+                          items: ExpenseCategories.all.map((category) {
+                            return DropdownMenuItem(
+                              value: category,
+                              child: Row(
+                                children: [
+                                  Icon(_getCategoryIcon(category), size: 20),
+                                  const SizedBox(width: 10),
+                                  Text(category),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedCategory = value!;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Date Picker
+                        InkWell(
+                          onTap: () => _selectDate(context),
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'Date',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              filled: true,
+                              suffixIcon: const Icon(Icons.calendar_today),
+                            ),
+                            child: Text(
+                              dateFormatter.format(_selectedDate),
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Note Field (Optional)
+                        TextFormField(
+                          controller: _noteController,
+                          decoration: InputDecoration(
+                            labelText: 'Note (Optional)',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            filled: true,
+                            hintText: 'Add a note about this expense',
+                          ),
+                          maxLines: 3,
+                          maxLength: 200,
+                        ),
+                        const SizedBox(height: 20),
+
+                        const SizedBox(height: 30),
+
+                        // Save Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _saveExpense,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Text(
+                              'Save Expense',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                       ],
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter an amount';
-                        }
-                        final amount = double.tryParse(value);
-                        if (amount == null || amount <= 0) {
-                          return 'Please enter a valid amount';
-                        }
-                        return null;
-                      },
                     ),
-                    const SizedBox(height: 20),
-
-                    // Category Dropdown
-                    DropdownButtonFormField<String>(
-                      value: _selectedCategory,
-                      decoration: InputDecoration(
-                        labelText: 'Category',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        filled: true,
-                      ),
-                      items: ExpenseCategories.all.map((category) {
-                        return DropdownMenuItem(
-                          value: category,
-                          child: Row(
-                            children: [
-                              Icon(_getCategoryIcon(category), size: 20),
-                              const SizedBox(width: 10),
-                              Text(category),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedCategory = value!;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Date Picker
-                    InkWell(
-                      onTap: () => _selectDate(context),
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: 'Date',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          filled: true,
-                          suffixIcon: const Icon(Icons.calendar_today),
-                        ),
-                        child: Text(
-                          dateFormatter.format(_selectedDate),
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Note Field (Optional)
-                    TextFormField(
-                      controller: _noteController,
-                      decoration: InputDecoration(
-                        labelText: 'Note (Optional)',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        filled: true,
-                        hintText: 'Add a note about this expense',
-                      ),
-                      maxLines: 3,
-                      maxLength: 200,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Currency Dropdown (currently only USD, scalable for future)
-                    DropdownButtonFormField<String>(
-                      value: _selectedCurrency,
-                      decoration: InputDecoration(
-                        labelText: 'Currency',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        filled: true,
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'USD', child: Text('USD (\$)')),
-                        // TODO: Add more currencies in the future
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedCurrency = value!;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 30),
-
-                    // Save Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _saveExpense,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'Save Expense',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
     );
   }
 
