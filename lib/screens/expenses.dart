@@ -22,6 +22,7 @@ import 'package:intl/intl.dart'; // Package for date formatting
 import 'addexpense.dart'; // Screen for adding new expenses
 import '../models/expense.dart'; // Expense data model
 import '../database/database_helper.dart'; // SQLite database helper
+import '../screens/settings.dart'; // For currency settings
 
 // Main Expenses widget (StatefulWidget for dynamic data)
 class Expenses extends StatefulWidget {
@@ -165,10 +166,17 @@ class _ExpensesState extends State<Expenses> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // App bar with title
-      appBar: AppBar(
-        title: const Text('Expenses'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      // Replace AppBar with banner image
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(100), // Reduced to 100px
+        child: Container(
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('images/track_ya_cash_img.png'),
+              fit: BoxFit.cover, // This will make the image cover the full banner area
+            ),
+          ),
+        ),
       ),
 
       body: _isLoading
