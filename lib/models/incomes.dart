@@ -80,8 +80,8 @@ class Incomes {
 class IncomeCategories {
   static const String salary = 'Salary';
   static const String selfEmployment = 'Self Employment';
-  static const String bonus = 'Bonuses';
-  static const String capitalGain = 'Capital Gains';
+  static const String bonus = 'Bonus';
+  static const String capitalGain = 'Capital Gain';
   static const String other = 'Other';
 
   static const List<String> all = [

@@ -139,9 +139,9 @@ class _IncomeState extends State<Income> {
   // Used in: income cards and category dropdown
   IconData _getCategoryIcon(String category) {
     const icons = {
-      'Salary': Icons.cases_rounded,
+      'Salary': Icons.attach_money_rounded,
       'Self Employment': Icons.person,
-      'Bonus': Icons.celebration_rounded,
+      'Bonus': Icons.card_giftcard_rounded,
       'Capital Gain': Icons.line_axis_rounded,
       'Other': Icons.category,
     };
@@ -240,7 +240,7 @@ class _IncomeState extends State<Income> {
               style: const TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
-                color: Colors.red,
+                color: Colors.green,
               ),
             ),
             const SizedBox(height: 4),
@@ -426,7 +426,7 @@ class _IncomeState extends State<Income> {
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Colors.red, // Red color emphasizes income (money going out)
+            color: Colors.green, // Red color emphasizes income (money going out)
           ),
         ),
 
