@@ -229,7 +229,7 @@ class _ExpensesState extends State<Expenses> {
   }
 
   // Build total spending card widget
-  // Displays Income, Spending, and Income Remaining in a row
+  // Displays Spending and Income Remaining in a row
   Widget _buildTotalSpendingCard() {
     final incomeRemaining = _totalIncome - _totalSpending;
 
@@ -241,40 +241,19 @@ class _ExpensesState extends State<Expenses> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            // Income column
-            Expanded(
-              child: Column(
-                children: [
-                  const Text(
-                    'Income',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '\$${_totalIncome.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
             // Spending column
             Expanded(
               child: Column(
                 children: [
                   const Text(
                     'Spending',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '\$${_totalSpending.toStringAsFixed(2)}',
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.red,
                     ),
@@ -283,20 +262,22 @@ class _ExpensesState extends State<Expenses> {
               ),
             ),
 
+            // Vertical divider
+            Container(height: 60, width: 1, color: Colors.grey[300]),
+
             // Income Remaining column
             Expanded(
               child: Column(
                 children: [
                   const Text(
-                    'Income Remaining',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    'Remaining',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '\$${incomeRemaining.toStringAsFixed(2)}',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: incomeRemaining >= 0 ? Colors.blue : Colors.red,
                     ),
