@@ -22,7 +22,6 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import '../models/expense.dart';
 import '../models/incomes.dart';
-import '../screens/settings.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -208,9 +207,7 @@ class DatabaseHelper {
     db.close();
   }
 
-  // -----------------------------
-// INCOME CRUD OPERATIONS
-// -----------------------------
+  // INCOME CRUD OPERATIONS
 
 // Insert a new income
   Future<int> createIncome(Incomes income) async {
@@ -296,9 +293,7 @@ class DatabaseHelper {
     );
   }
 
-// -----------------------------
 // AGGREGATE INCOME QUERIES
-// -----------------------------
 
 // Total income amount
   Future<double> getTotalIncome() async {
@@ -341,5 +336,11 @@ class DatabaseHelper {
     }
     return 'USD'; // fallback
   }
-}
 
+  // Clear all data from database (expenses and incomes)
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.delete('expenses');
+    await db.delete('incomes');
+  }
+}

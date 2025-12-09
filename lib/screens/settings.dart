@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../database/database_helper.dart';
 
 class Settings extends StatefulWidget {
   final bool isDarkMode;
@@ -63,6 +64,64 @@ class _SettingsState extends State<Settings> {
     }
   }
 
+  void _showClearDatabaseDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Clear Database'),
+          content: const Text(
+            'Are you sure you want to clear all expenses and income data? This action cannot be undone.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+            TextButton(
+              child: const Text(
+                'Clear',
+                style: TextStyle(color: Colors.red),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                _clearDatabase(); // Clear the database
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _clearDatabase() async {
+    try {
+      // Clear all expenses and incomes from database
+      await DatabaseHelper.instance.clearAllData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Database cleared successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error clearing database: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error clearing database: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -110,6 +169,26 @@ class _SettingsState extends State<Settings> {
                       });
                       _saveCurrency(value!); // Save choice persistently
                     },
+                  ),
+                ),
+                // Clear Database Button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: _showClearDatabaseDialog,
+                      icon: const Icon(Icons.delete_forever),
+                      label: const Text('Clear Database'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
