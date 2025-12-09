@@ -9,6 +9,7 @@ Features Implemented:
 - Categorical summary with pie chart
 - Total spending calculation
 - Chronological income list with icons and colors
+- Currency conversion based on user settings
 
 Features to Develop:
 - Edit income functionality
@@ -17,14 +18,14 @@ Features to Develop:
  */
 
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart'; // Package for pie chart visualization
-import 'package:intl/intl.dart'; // Package for date formatting
-import 'addincome.dart'; // Screen for adding new incomes
-import '../models/incomes.dart'; // Income data model
-import '../database/database_helper.dart'; // SQLite database helper
-import '../screens/settings.dart'; // For currency settings
+import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
+import 'addincome.dart';
+import '../models/incomes.dart';
+import '../database/database_helper.dart';
+import '../screens/settings.dart';
+import '../models/currency_helper.dart'; // Import the helper
 
-// Main Incomes widget (StatefulWidget for dynamic data)
 class Income extends StatefulWidget {
   const Income({Key? key}) : super(key: key);
 
@@ -32,51 +33,60 @@ class Income extends StatefulWidget {
   State<Income> createState() => _IncomeState();
 }
 
-// State class for Incomes - manages data and UI updates
 class _IncomeState extends State<Income> {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
 
-  // State variables to hold income data
-  List<Incomes> _income = []; // List of all incomes
-  Map<String, double> _categoryTotals = {}; // Total spending per category
-  double _totalEarnings = 0.0; // Grand total of all incomes
-  bool _isLoading = true; // Loading state for async operations
+  List<Incomes> _income = [];
+  Map<String, double> _categoryTotals = {};
+  double _totalEarnings = 0.0;
+  bool _isLoading = true;
+  String _displayCurrency = 'USD'; // Current display currency
 
-  // Start up
   @override
   void initState() {
     super.initState();
-    _loadIncomes(); // Load incomes from database on startup
+    _loadIncomes();
   }
 
-  // Load all incomes from database and calculate totals
   Future<void> _loadIncomes() async {
     setState(() => _isLoading = true);
 
-    // DEBUG: Print database location and contents to console
     await _debugDatabase();
 
-    // Fetch all incomes from database (sorted by date, most recent first)
+    // Get the current display currency from settings
+    final displayCurrency = await CurrencyHelper.getCurrentCurrency();
+
     final income = await _dbHelper.getAllIncomes();
-    // TODO: To filter by current month only
 
-    // Get spending totals grouped by category (for pie chart)
-    final categoryTotals = await _dbHelper.getIncomeByCategory();
+    // Calculate totals manually by converting each income individually
+    double totalEarnings = 0.0;
+    Map<String, double> categoryTotals = {};
 
-    // Get grand total of all incomes
-    final total = await _dbHelper.getTotalIncome();
+    for (var inc in income) {
+      // Convert each income amount to display currency
+      final convertedAmount = CurrencyHelper.convert(
+        amount: inc.amount,
+        fromCurrency: inc.currency,
+        toCurrency: displayCurrency,
+      );
 
-    // Update UI with fetched data
+      // Add to total earnings
+      totalEarnings += convertedAmount;
+
+      // Add to category totals
+      categoryTotals[inc.category] =
+          (categoryTotals[inc.category] ?? 0.0) + convertedAmount;
+    }
+
     setState(() {
       _income = income;
       _categoryTotals = categoryTotals;
-      _totalEarnings = total;
-      _isLoading = false; // Hide loading indicator
+      _totalEarnings = totalEarnings;
+      _displayCurrency = displayCurrency;
+      _isLoading = false;
     });
   }
 
-  // Debug method to print database info to console (for dev)
-  // Prints: database path, income count, and list of all incomes
   Future<void> _debugDatabase() async {
     final db = await _dbHelper.database;
     print('DATABASE LOCATION: ${db.path}');
@@ -99,31 +109,24 @@ class _IncomeState extends State<Income> {
     print('━' * 60);
   }
 
-  // Navigate to Add Income screen and refresh data on return
-  // Called when Floating Action Button is pressed
   Future<void> _navigateToAddIncome() async {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddIncome()),
     );
-    // Refresh incomes list after returning (in case new income was added)
     _loadIncomes();
   }
 
-  // Delete an income from database by ID
-  // Shows confirmation snackbar after deletion
   Future<void> _deleteIncome(int id) async {
     await _dbHelper.deleteIncome(id);
-    _loadIncomes(); // Reload data to reflect deletion
+    _loadIncomes();
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Income deleted')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Income deleted')),
+      );
     }
   }
 
-  // Get the color associated with each category (for UI consistency)
-  // Used in: pie chart, category icons, and legend
   Color _getCategoryColor(String category) {
     const colors = {
       'Salary': Colors.orange,
@@ -132,12 +135,9 @@ class _IncomeState extends State<Income> {
       'Capital Gain': Colors.red,
       'Other': Colors.grey,
     };
-    return colors[category] ??
-        Colors.grey; // Default to grey if category not found
+    return colors[category] ?? Colors.grey;
   }
 
-  // Get the icon associated with each category
-  // Used in: income cards and category dropdown
   IconData _getCategoryIcon(String category) {
     const icons = {
       'Salary': Icons.attach_money_rounded,
@@ -146,16 +146,12 @@ class _IncomeState extends State<Income> {
       'Capital Gain': Icons.line_axis_rounded,
       'Other': Icons.category,
     };
-    return icons[category] ??
-        Icons.category; // Default to category icon if not found
+    return icons[category] ?? Icons.category;
   }
 
-  // Main build method - constructs the UI
-  // Three possible states: loading, empty, or displaying incomes
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // App bar with title
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(100),
         child: Container(
@@ -167,29 +163,19 @@ class _IncomeState extends State<Income> {
           ),
         ),
       ),
-
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _income.isEmpty
-          ? _buildEmptyState() // Show "no incomes" message if empty
+          ? _buildEmptyState()
           : SingleChildScrollView(
-              // Show incomes data if available
-              child: Column(
-                children: [
-                  // Total Earnings Card - displays grand total
-                  _buildTotalEarningsCard(),
-
-                  // Pie Chart Section - visual breakdown by category
-                  // Only shown if there are categorized incomes
-                  if (_categoryTotals.isNotEmpty) _buildPieChartSection(),
-
-                  // Incomes List - chronological list of all incomes
-                  _buildIncomeList(),
-                ],
-              ),
-            ),
-
-      // Navigates to Add Income screen
+        child: Column(
+          children: [
+            _buildTotalEarningsCard(),
+            if (_categoryTotals.isNotEmpty) _buildPieChartSection(),
+            _buildIncomeList(),
+          ],
+        ),
+      ),
       floatingActionButton: FloatingActionButton.small(
         onPressed: _navigateToAddIncome,
         child: const Icon(Icons.add),
@@ -197,25 +183,18 @@ class _IncomeState extends State<Income> {
     );
   }
 
-  // Build empty state widget
-  // Shown when no incomes exist in database
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Large icon for visual emphasis
           Icon(Icons.receipt_long, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
-
-          // Main message
           Text(
             'No incomes yet',
             style: TextStyle(fontSize: 20, color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
-
-          // Guides user to add first income
           Text(
             'Tap + to add your first income',
             style: TextStyle(fontSize: 14, color: Colors.grey[500]),
@@ -225,8 +204,6 @@ class _IncomeState extends State<Income> {
     );
   }
 
-  // Build total earnings card widget
-  // Displays the sum of all incomes in a prominent card
   Widget _buildTotalEarningsCard() {
     return Card(
       margin: const EdgeInsets.all(16),
@@ -235,16 +212,13 @@ class _IncomeState extends State<Income> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // Card title
             const Text(
               'Total Earnings',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 8),
-
-            // Large total amount in red (income color)
             Text(
-              '\$${_totalEarnings.toStringAsFixed(2)}',
+              CurrencyHelper.formatAmount(_totalEarnings, _displayCurrency),
               style: const TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
@@ -252,8 +226,6 @@ class _IncomeState extends State<Income> {
               ),
             ),
             const SizedBox(height: 4),
-
-            // Time period label
             Text(
               'All time',
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
@@ -264,8 +236,6 @@ class _IncomeState extends State<Income> {
     );
   }
 
-  // Build pie chart section widget
-  // Displays visual breakdown of spending by category with legend
   Widget _buildPieChartSection() {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -275,28 +245,23 @@ class _IncomeState extends State<Income> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Section title
             const Text(
               'Earnings by Category',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-
-            // Pie chart visualization
             SizedBox(
               height: 200,
               child: PieChart(
                 PieChartData(
-                  sections: _buildPieChartSections(), // Generate chart sections
-                  sectionsSpace: 2, // Space between pie slices
-                  centerSpaceRadius: 40, // Donut hole radius
-                  borderData: FlBorderData(show: false), // No outer border
+                  sections: _buildPieChartSections(),
+                  sectionsSpace: 2,
+                  centerSpaceRadius: 40,
+                  borderData: FlBorderData(show: false),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-
-            // Legend showing category colors and totals
             _buildLegend(),
           ],
         ),
@@ -304,39 +269,33 @@ class _IncomeState extends State<Income> {
     );
   }
 
-  // Build pie chart sections from category totals
-  // Each section represents one income category with color and percentage
   List<PieChartSectionData> _buildPieChartSections() {
     return _categoryTotals.entries.map((entry) {
-      // Calculate percentage of total for this category
       final percentage = (_categoryTotals[entry.key]! / _totalEarnings) * 100;
+      final amount = entry.value;
 
       return PieChartSectionData(
-        color: _getCategoryColor(entry.key), // Category-specific color
-        value: entry.value, // Actual spending amount (determines slice size)
-        title:
-            '${percentage.toStringAsFixed(1)}%', // Display percentage on slice
-        radius: 80, // Slice radius (thickness)
+        color: _getCategoryColor(entry.key),
+        value: entry.value,
+        title: '${percentage.toStringAsFixed(1)}%\n${CurrencyHelper.formatAmount(amount, _displayCurrency)}',
+        radius: 80,
         titleStyle: const TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.bold,
-          color: Colors.white, // White text for contrast
+          color: Colors.white,
         ),
       );
     }).toList();
   }
 
-  // Build legend widget
-  // Shows colored circles with category names and amounts
   Widget _buildLegend() {
     return Wrap(
-      spacing: 16, // Horizontal spacing between items
-      runSpacing: 8, // Vertical spacing between rows
+      spacing: 16,
+      runSpacing: 8,
       children: _categoryTotals.entries.map((entry) {
         return Row(
-          mainAxisSize: MainAxisSize.min, // Shrink to fit content
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Colored circle indicator (matches pie chart color)
             Container(
               width: 16,
               height: 16,
@@ -346,10 +305,8 @@ class _IncomeState extends State<Income> {
               ),
             ),
             const SizedBox(width: 6),
-
-            // Category name and total amount
             Text(
-              '${entry.key}: \$${entry.value.toStringAsFixed(2)}',
+              '${entry.key}: ${CurrencyHelper.formatAmount(entry.value, _displayCurrency)}',
               style: const TextStyle(fontSize: 12),
             ),
           ],
@@ -358,31 +315,24 @@ class _IncomeState extends State<Income> {
     );
   }
 
-  // Build income list widget
-  // Displays all incomes in a scrollable list using ListView.builder
   Widget _buildIncomeList() {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section title
           const Text(
             'Recent Income',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-
-          // List of income cards
-          // Using ListView.builder for efficient rendering of large lists
           ListView.builder(
-            shrinkWrap: true, // Let ListView size itself based on children
-            physics:
-                const NeverScrollableScrollPhysics(), // Disable internal scrolling (parent ScrollView handles it)
-            itemCount: _income.length, // Number of items to display
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _income.length,
             itemBuilder: (context, index) {
               final income = _income[index];
-              return _buildIncomeCard(income); // Build card for each income
+              return _buildIncomeCard(income);
             },
           ),
         ],
@@ -390,56 +340,53 @@ class _IncomeState extends State<Income> {
     );
   }
 
-  // Build individual income card widget
-  // Displays income details in a card with long-press delete functionality
   Widget _buildIncomeCard(Incomes incomes) {
-    // Date formatter for displaying dates in readable format (e.g., "Dec 07, 2024")
     final dateFormatter = DateFormat('MMM dd, yyyy');
-    final date = DateTime.parse(incomes.date); // Parse ISO date string
+    final date = DateTime.parse(incomes.date);
+
+    // Convert income amount to display currency
+    final convertedAmount = CurrencyHelper.convert(
+      amount: incomes.amount,
+      fromCurrency: incomes.currency,
+      toCurrency: _displayCurrency,
+    );
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        // Left side: Category icon in colored circle
         leading: CircleAvatar(
           backgroundColor: _getCategoryColor(incomes.category),
           child: Icon(_getCategoryIcon(incomes.category), color: Colors.white),
         ),
-
-        // Main content: Category name and details
         title: Text(
           incomes.category,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-
-        // Subtitle: Date and optional note
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Formatted date
             Text(dateFormatter.format(date)),
-
-            // Optional note (only shown if note exists and is not empty)
             if (incomes.note != null && incomes.note!.isNotEmpty)
               Text(
                 incomes.note!,
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
+            // Show original currency if different from display currency
+            if (incomes.currency != _displayCurrency)
+              Text(
+                'Original: ${incomes.currency} \$${incomes.amount.toStringAsFixed(2)}',
+                style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+              ),
           ],
         ),
-
-        // Right side: Amount with currency
         trailing: Text(
-          '${incomes.currency} \$${incomes.amount.toStringAsFixed(2)}',
+          CurrencyHelper.formatAmount(convertedAmount, _displayCurrency),
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Colors.green, // Red color emphasizes income (money going out)
+            color: Colors.green,
           ),
         ),
-
-        // Long-press handler: Show delete confirmation dialog
-        // TODO: Add edit functionality here as well
         onLongPress: () {
           showDialog(
             context: context,
@@ -449,17 +396,14 @@ class _IncomeState extends State<Income> {
                 'Are you sure you want to delete this income?',
               ),
               actions: [
-                // Cancel button
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('Cancel'),
                 ),
-
-                // Delete button (red to indicate destructive action)
                 TextButton(
                   onPressed: () {
-                    Navigator.pop(context); // Close dialog
-                    _deleteIncome(incomes.id!); // Delete income from database
+                    Navigator.pop(context);
+                    _deleteIncome(incomes.id!);
                   },
                   child: const Text(
                     'Delete',

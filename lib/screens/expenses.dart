@@ -9,6 +9,7 @@ Features Implemented:
 - Categorical summary with pie chart
 - Total spending calculation
 - Chronological expense list with icons and colors
+- Currency conversion based on user settings
 
 Features to Develop:
 - Edit expense functionality
@@ -17,14 +18,14 @@ Features to Develop:
  */
 
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart'; // Package for pie chart visualization
-import 'package:intl/intl.dart'; // Package for date formatting
-import 'addexpense.dart'; // Screen for adding new expenses
-import '../models/expense.dart'; // Expense data model
-import '../database/database_helper.dart'; // SQLite database helper
-import '../screens/settings.dart'; // For currency settings
+import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
+import 'addexpense.dart';
+import '../models/expense.dart';
+import '../database/database_helper.dart';
+import '../screens/settings.dart';
+import '../models/currency_helper.dart'; // Import the helper
 
-// Main Expenses widget (StatefulWidget for dynamic data)
 class Expenses extends StatefulWidget {
   const Expenses({Key? key}) : super(key: key);
 
@@ -32,56 +33,83 @@ class Expenses extends StatefulWidget {
   State<Expenses> createState() => _ExpensesState();
 }
 
-// State class for Expenses - manages data and UI updates
 class _ExpensesState extends State<Expenses> {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
 
-  // State variables to hold expense data
-  List<Expense> _expenses = []; // List of all expenses
-  Map<String, double> _categoryTotals = {}; // Total spending per category
-  double _totalSpending = 0.0; // Grand total of all expenses
-  double _totalIncome = 0.0; // Total income from income screen
-  bool _isLoading = true; // Loading state for async operations
+  List<Expense> _expenses = [];
+  Map<String, double> _categoryTotals = {};
+  double _totalSpending = 0.0;
+  double _totalIncome = 0.0;
+  bool _isLoading = true;
+  String _displayCurrency = 'USD'; // Current display currency
 
-  // Start up
   @override
   void initState() {
     super.initState();
-    _loadExpenses(); // Load expenses from database on startup
+    _loadExpenses();
   }
 
-  // Load all expenses from database and calculate totals
   Future<void> _loadExpenses() async {
     setState(() => _isLoading = true);
 
-    // DEBUG: Print database location and contents to console
     await _debugDatabase();
 
-    // Fetch all expenses from database (sorted by date, most recent first)
+    // Get the current display currency from settings
+    final displayCurrency = await CurrencyHelper.getCurrentCurrency();
+    print('Display Currency: $displayCurrency');
+
     final expenses = await _dbHelper.getAllExpenses();
-    // TODO: To filter by current month only
 
-    // Get spending totals grouped by category (for pie chart)
-    final categoryTotals = await _dbHelper.getSpendingByCategory();
+    // Calculate totals manually by converting each expense individually
+    double totalSpending = 0.0;
+    Map<String, double> categoryTotals = {};
 
-    // Get grand total of all expenses
-    final total = await _dbHelper.getTotalSpending();
+    for (var expense in expenses) {
+      print('Converting: ${expense.amount} ${expense.currency} -> $displayCurrency');
 
-    // Get total income from income screen
-    final totalIncome = await _dbHelper.getTotalIncome();
+      // Convert each expense amount to display currency
+      final convertedAmount = CurrencyHelper.convert(
+        amount: expense.amount,
+        fromCurrency: expense.currency,
+        toCurrency: displayCurrency,
+      );
 
-    // Update UI with fetched data
+      print('Converted to: $convertedAmount $displayCurrency');
+
+      // Add to total spending
+      totalSpending += convertedAmount;
+
+      // Add to category totals
+      categoryTotals[expense.category] =
+          (categoryTotals[expense.category] ?? 0.0) + convertedAmount;
+    }
+
+    print('Total Spending: $totalSpending $displayCurrency');
+    print('Category Totals: $categoryTotals');
+
+    // Get all incomes and convert them
+    final incomes = await _dbHelper.getAllIncomes();
+    double totalIncome = 0.0;
+
+    for (var income in incomes) {
+      final convertedAmount = CurrencyHelper.convert(
+        amount: income.amount,
+        fromCurrency: income.currency,
+        toCurrency: displayCurrency,
+      );
+      totalIncome += convertedAmount;
+    }
+
     setState(() {
       _expenses = expenses;
       _categoryTotals = categoryTotals;
-      _totalSpending = total;
+      _totalSpending = totalSpending;
       _totalIncome = totalIncome;
-      _isLoading = false; // Hide loading indicator
+      _displayCurrency = displayCurrency;
+      _isLoading = false;
     });
   }
 
-  // Debug method to print database info to console (for dev)
-  // Prints: database path, expense count, and list of all expenses
   Future<void> _debugDatabase() async {
     final db = await _dbHelper.database;
     print('DATABASE LOCATION: ${db.path}');
@@ -104,31 +132,24 @@ class _ExpensesState extends State<Expenses> {
     print('━' * 60);
   }
 
-  // Navigate to Add Expense screen and refresh data on return
-  // Called when Floating Action Button is pressed
   Future<void> _navigateToAddExpense() async {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddExpense()),
     );
-    // Refresh expenses list after returning (in case new expense was added)
     _loadExpenses();
   }
 
-  // Delete an expense from database by ID
-  // Shows confirmation snackbar after deletion
   Future<void> _deleteExpense(int id) async {
     await _dbHelper.deleteExpense(id);
-    _loadExpenses(); // Reload data to reflect deletion
+    _loadExpenses();
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Expense deleted')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Expense deleted')),
+      );
     }
   }
 
-  // Get the color associated with each category (for UI consistency)
-  // Used in: pie chart, category icons, and legend
   Color _getCategoryColor(String category) {
     const colors = {
       'Food': Colors.orange,
@@ -140,12 +161,9 @@ class _ExpensesState extends State<Expenses> {
       'Transportation': Colors.teal,
       'Other': Colors.grey,
     };
-    return colors[category] ??
-        Colors.grey; // Default to grey if category not found
+    return colors[category] ?? Colors.grey;
   }
 
-  // Get the icon associated with each category
-  // Used in: expense cards and category dropdown
   IconData _getCategoryIcon(String category) {
     const icons = {
       'Food': Icons.restaurant,
@@ -157,50 +175,36 @@ class _ExpensesState extends State<Expenses> {
       'Transportation': Icons.directions_bus,
       'Other': Icons.category,
     };
-    return icons[category] ??
-        Icons.category; // Default to category icon if not found
+    return icons[category] ?? Icons.category;
   }
 
-  // Main build method - constructs the UI
-  // Three possible states: loading, empty, or displaying expenses
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Replace AppBar with banner image
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(100), // Reduced to 100px
+        preferredSize: const Size.fromHeight(100),
         child: Container(
           decoration: BoxDecoration(
             image: DecorationImage(
               image: AssetImage('images/track_ya_cash_img.png'),
-              fit: BoxFit.cover, // This will make the image cover the full banner area
+              fit: BoxFit.cover,
             ),
           ),
         ),
       ),
-
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _expenses.isEmpty
-          ? _buildEmptyState() // Show "no expenses" message if empty
+          ? _buildEmptyState()
           : SingleChildScrollView(
-              // Show expense data if available
-              child: Column(
-                children: [
-                  // Total Spending Card - displays grand total
-                  _buildTotalSpendingCard(),
-
-                  // Pie Chart Section - visual breakdown by category
-                  // Only shown if there are categorized expenses
-                  if (_categoryTotals.isNotEmpty) _buildPieChartSection(),
-
-                  // Expenses List - chronological list of all expenses
-                  _buildExpensesList(),
-                ],
-              ),
-            ),
-
-      // Navigates to Add Expense screen
+        child: Column(
+          children: [
+            _buildTotalSpendingCard(),
+            if (_categoryTotals.isNotEmpty) _buildPieChartSection(),
+            _buildExpensesList(),
+          ],
+        ),
+      ),
       floatingActionButton: FloatingActionButton.small(
         onPressed: _navigateToAddExpense,
         child: const Icon(Icons.add),
@@ -208,25 +212,18 @@ class _ExpensesState extends State<Expenses> {
     );
   }
 
-  // Build empty state widget
-  // Shown when no expenses exist in database
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Large icon for visual emphasis
           Icon(Icons.receipt_long, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
-
-          // Main message
           Text(
             'No expenses yet',
             style: TextStyle(fontSize: 20, color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
-
-          // Guides user to add first expense
           Text(
             'Tap + to add your first expense',
             style: TextStyle(fontSize: 14, color: Colors.grey[500]),
@@ -236,8 +233,6 @@ class _ExpensesState extends State<Expenses> {
     );
   }
 
-  // Build total spending card widget
-  // Displays Spending and Income Remaining in a row
   Widget _buildTotalSpendingCard() {
     final incomeRemaining = _totalIncome - _totalSpending;
 
@@ -249,7 +244,6 @@ class _ExpensesState extends State<Expenses> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            // Spending column
             Expanded(
               child: Column(
                 children: [
@@ -259,7 +253,7 @@ class _ExpensesState extends State<Expenses> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '\$${_totalSpending.toStringAsFixed(2)}',
+                    CurrencyHelper.formatAmount(_totalSpending, _displayCurrency),
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -269,11 +263,7 @@ class _ExpensesState extends State<Expenses> {
                 ],
               ),
             ),
-
-            // Vertical divider
             Container(height: 60, width: 1, color: Colors.grey[300]),
-
-            // Income Remaining column
             Expanded(
               child: Column(
                 children: [
@@ -283,7 +273,7 @@ class _ExpensesState extends State<Expenses> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '\$${incomeRemaining.toStringAsFixed(2)}',
+                    CurrencyHelper.formatAmount(incomeRemaining, _displayCurrency),
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -299,8 +289,6 @@ class _ExpensesState extends State<Expenses> {
     );
   }
 
-  // Build pie chart section widget
-  // Displays visual breakdown of spending by category with legend
   Widget _buildPieChartSection() {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -310,28 +298,23 @@ class _ExpensesState extends State<Expenses> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Section title
             const Text(
               'Spending by Category',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-
-            // Pie chart visualization
             SizedBox(
               height: 200,
               child: PieChart(
                 PieChartData(
-                  sections: _buildPieChartSections(), // Generate chart sections
-                  sectionsSpace: 2, // Space between pie slices
-                  centerSpaceRadius: 40, // Donut hole radius
-                  borderData: FlBorderData(show: false), // No outer border
+                  sections: _buildPieChartSections(),
+                  sectionsSpace: 2,
+                  centerSpaceRadius: 40,
+                  borderData: FlBorderData(show: false),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-
-            // Legend showing category colors and totals
             _buildLegend(),
           ],
         ),
@@ -339,40 +322,33 @@ class _ExpensesState extends State<Expenses> {
     );
   }
 
-  // Build pie chart sections from category totals
-  // Each section represents one expense category with color, percentage, and dollar amount
   List<PieChartSectionData> _buildPieChartSections() {
     return _categoryTotals.entries.map((entry) {
-      // Calculate percentage of total for this category
       final percentage = (_categoryTotals[entry.key]! / _totalSpending) * 100;
-      final dollarAmount = entry.value;
+      final amount = entry.value;
 
       return PieChartSectionData(
-        color: _getCategoryColor(entry.key), // Category-specific color
-        value: entry.value, // Actual spending amount (determines slice size)
-        title:
-            '${percentage.toStringAsFixed(1)}%\n\$${dollarAmount.toStringAsFixed(2)}', // Display percentage and dollar amount on slice
-        radius: 80, // Slice radius (thickness)
+        color: _getCategoryColor(entry.key),
+        value: entry.value,
+        title: '${percentage.toStringAsFixed(1)}%\n${CurrencyHelper.formatAmount(amount, _displayCurrency)}',
+        radius: 80,
         titleStyle: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.bold,
-          color: Colors.white, // White text for contrast
+          color: Colors.white,
         ),
       );
     }).toList();
   }
 
-  // Build legend widget
-  // Shows colored circles with category names and amounts
   Widget _buildLegend() {
     return Wrap(
-      spacing: 16, // Horizontal spacing between items
-      runSpacing: 8, // Vertical spacing between rows
+      spacing: 16,
+      runSpacing: 8,
       children: _categoryTotals.entries.map((entry) {
         return Row(
-          mainAxisSize: MainAxisSize.min, // Shrink to fit content
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Colored circle indicator (matches pie chart color)
             Container(
               width: 16,
               height: 16,
@@ -382,10 +358,8 @@ class _ExpensesState extends State<Expenses> {
               ),
             ),
             const SizedBox(width: 6),
-
-            // Category name and total amount
             Text(
-              '${entry.key}: \$${entry.value.toStringAsFixed(2)}',
+              '${entry.key}: ${CurrencyHelper.formatAmount(entry.value, _displayCurrency)}',
               style: const TextStyle(fontSize: 12),
             ),
           ],
@@ -394,31 +368,24 @@ class _ExpensesState extends State<Expenses> {
     );
   }
 
-  // Build expenses list widget
-  // Displays all expenses in a scrollable list using ListView.builder
   Widget _buildExpensesList() {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section title
           const Text(
             'Recent Expenses',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-
-          // List of expense cards
-          // Using ListView.builder for efficient rendering of large lists
           ListView.builder(
-            shrinkWrap: true, // Let ListView size itself based on children
-            physics:
-                const NeverScrollableScrollPhysics(), // Disable internal scrolling (parent ScrollView handles it)
-            itemCount: _expenses.length, // Number of items to display
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _expenses.length,
             itemBuilder: (context, index) {
               final expense = _expenses[index];
-              return _buildExpenseCard(expense); // Build card for each expense
+              return _buildExpenseCard(expense);
             },
           ),
         ],
@@ -426,56 +393,53 @@ class _ExpensesState extends State<Expenses> {
     );
   }
 
-  // Build individual expense card widget
-  // Displays expense details in a card with long-press delete functionality
   Widget _buildExpenseCard(Expense expense) {
-    // Date formatter for displaying dates in readable format (e.g., "Dec 07, 2024")
     final dateFormatter = DateFormat('MMM dd, yyyy');
-    final date = DateTime.parse(expense.date); // Parse ISO date string
+    final date = DateTime.parse(expense.date);
+
+    // Convert expense amount to display currency
+    final convertedAmount = CurrencyHelper.convert(
+      amount: expense.amount,
+      fromCurrency: expense.currency,
+      toCurrency: _displayCurrency,
+    );
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        // Left side: Category icon in colored circle
         leading: CircleAvatar(
           backgroundColor: _getCategoryColor(expense.category),
           child: Icon(_getCategoryIcon(expense.category), color: Colors.white),
         ),
-
-        // Main content: Category name and details
         title: Text(
           expense.category,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-
-        // Subtitle: Date and optional note
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Formatted date
             Text(dateFormatter.format(date)),
-
-            // Optional note (only shown if note exists and is not empty)
             if (expense.note != null && expense.note!.isNotEmpty)
               Text(
                 expense.note!,
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
+            // Show original currency if different from display currency
+            if (expense.currency != _displayCurrency)
+              Text(
+                'Original: ${expense.currency} \$${expense.amount.toStringAsFixed(2)}',
+                style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+              ),
           ],
         ),
-
-        // Right side: Amount with currency
         trailing: Text(
-          '${expense.currency} \$${expense.amount.toStringAsFixed(2)}',
+          CurrencyHelper.formatAmount(convertedAmount, _displayCurrency),
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Colors.red, // Red color emphasizes expense (money going out)
+            color: Colors.red,
           ),
         ),
-
-        // Long-press handler: Show delete confirmation dialog
-        // TODO: Add edit functionality here as well
         onLongPress: () {
           showDialog(
             context: context,
@@ -485,17 +449,14 @@ class _ExpensesState extends State<Expenses> {
                 'Are you sure you want to delete this expense?',
               ),
               actions: [
-                // Cancel button
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('Cancel'),
                 ),
-
-                // Delete button (red to indicate destructive action)
                 TextButton(
                   onPressed: () {
-                    Navigator.pop(context); // Close dialog
-                    _deleteExpense(expense.id!); // Delete expense from database
+                    Navigator.pop(context);
+                    _deleteExpense(expense.id!);
                   },
                   child: const Text(
                     'Delete',
